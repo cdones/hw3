@@ -1,0 +1,128 @@
+data=read.csv(file.choose(),header=TRUE)
+pairs(data)
+summary(data)
+View(data)
+attach(data)
+
+par(mfrow=c(1,2))
+hist(cost)
+hist(employee)
+
+x = employee
+y = cost
+#non-parametric route####
+#h =1.06*sd(x)*length(x)^(-.2)   #doesn't work too well in this case
+#Optimizing for h
+P1 = function(h){
+  x1 = seq(min(x),max(x)+3,by=(max(x)+3-min(x))/999)
+  y1 = rep(0,1000)
+  z1 = rep(0,1000)
+  w1 = rep(0,1000)
+  for(i in 1:1000){
+    z1[i] = (0-x1[i])/h #zval
+    w1[i] = 1/(1-pnorm(z1[i])) #weight
+    y1[i] = w1[i]*sum((1/(length(x)*h*sqrt(2*pi))*exp(-.5*((x1[i]-x)/h)^2)))#f.hat
+  }	
+  output = sum((max(x)+3 - min(x))/999*y1^2)
+  output
+}
+P2 = function(h){
+  leave.out.estimate = rep(0,length(x))
+  z2 = rep(0,length(x))
+  w2 = rep(0,length(x))
+  for(i in 1:length(x)){
+    z2[i] = (0-x[i])/h
+    w2[i] = 1/(1-pnorm(z2[i]))
+    leave.out.estimate[i] = w2[i]*sum(1/(h*(length(x)-1)*sqrt(2*pi))*exp(-.5*((x[i]-x[-i])/h)^2))
+  }
+  output = -2*sum(leave.out.estimate)/length(x)
+  output
+}
+
+CV = function(h){P1(h) + P2(h)}
+
+h = optim(6,CV)$par
+
+plot(x,y,xlim=c(min(x)-10,max(x)+10),ylim=c(min(y)-30,max(y)+30))
+lines(c(min(x)-15,max(x)+15),c(0,0),lty=2)
+
+for(i in 1:15){
+  x1 = seq(x[i]-50,x[i]+50,by=1)
+  y1 = (1/(sqrt(2*pi)))*exp(-.5*((x[i]-x1)/h)^2)
+  lines(x1,y1*y[i]) 
+}
+
+x1 = seq(min(x),max(x))
+y1 = rep(0,101)
+for(i in 1:101){
+  y1[i] = sum((1/(sqrt(2*pi)))*exp(-.5*((x1[i]-x)/h)^2)*y)/sum((1/(sqrt(2*pi)))*exp(-.5*((x1[i]-x)/h)^2))
+}
+lines(x1,y1,col=2)
+
+y1[which(x1==55)]
+
+
+#########################################################################################
+###############-------------------BootStrapping-------------------#######################
+#########################################################################################
+##   get o.g. errors
+x1=x
+y.hat= rep(0,500)
+for(i in 1:500){
+  y.hat[i] = sum((1/(sqrt(2*pi)))*exp(-.5*((x1[i]-x)/h)^2)*y)/sum((1/(sqrt(2*pi)))*exp(-.5*((x1[i]-x)/h)^2))
+}
+errors=y-y.hat
+plot(errors) #errors look good
+
+B=1000
+n=500
+y.bs=matrix(0,nrow=B,ncol=n)
+yhat.bs=rep(0,n)
+ybar.bs=rep(0,B)
+for (j in 1:B){
+  x.bs=sample(x,n,replace=T) #sample x's
+ for (i in 1:n){
+   yhat.bs[i] = sum((1/(sqrt(2*pi)))*exp(-.5*((x.bs[i]-x)/h)^2)*y)/sum((1/(sqrt(2*pi)))*exp(-.5*((x.bs[i]-x)/h)^2))
+ }
+  y.bs[j,]=yhat.bs+sample(errors,n,replace = T)
+  ybar.bs[j]=mean(y.bs[j,])
+}
+
+hist(y.bs)
+hist(ybar.bs)
+quantile(yhat.bs,c(0.025,0.975))
+CI.upper=y1+1.96*sd(y.bs)
+CI.lower=y1-1.96*sd(y.bs)
+pred.upper=y1+1.96*sd(ybar.bs)
+pred.lower=y1-1.96*sd(ybar.bs)
+
+plot(x,y,xlim=c(min(x)-10,max(x)+10),ylim=c(min(y)-30,max(y)+30))
+lines(c(min(x)-15,max(x)+15),c(0,0),lty=2)
+lines(x1,y1,col=2)
+lines(x1,CI.upper,col=3)
+lines(x1,CI.lower,col=3)
+lines(x1,pred.upper,col=4)
+lines(x1,pred.lower,col=4)
+
+
+#splines route
+library(splines)
+fitp=lm(cost~poly(employee,6),data=data)
+fit=lm(cost~bs(employee, knots = c(20,40,60,80)))
+summary(fit)
+emp.grid=seq(from=range(employee)[1], to=range(employee)[2])
+pred=predict(fit,newdata = data.frame(employee=emp.grid),interval = "prediction")
+CI=predict(fit,newdata = data.frame(employee=emp.grid),interval = "confidence")
+
+
+plot(employee,cost)
+lines(emp.grid,pred[,1],col="red")
+lines(emp.grid,pred[,2],col="green")
+lines(emp.grid,pred[,3],col="green")
+
+lines(emp.grid,CI[,2],col="blue")
+lines(emp.grid,CI[,3],col="blue")
+
+predict(fit,newdata = data.frame(employee=55),interval = "prediction")
+predict(fit,newdata = data.frame(employee=55),interval = "confidence") 
+
