@@ -66,10 +66,10 @@ y1[which(x1==55)]
 ###############-------------------BootStrapping-------------------#######################
 #########################################################################################
 ##   get o.g. errors
-x1=x
+###!!!!!x1=x This shouldn't be here
 y.hat= rep(0,500)
 for(i in 1:500){
-  y.hat[i] = sum((1/(sqrt(2*pi)))*exp(-.5*((x1[i]-x)/h)^2)*y)/sum((1/(sqrt(2*pi)))*exp(-.5*((x1[i]-x)/h)^2))
+  y.hat[i] = sum((1/(sqrt(2*pi)))*exp(-.5*((x[i]-x)/h)^2)*y)/sum((1/(sqrt(2*pi)))*exp(-.5*((x[i]-x)/h)^2))
 }
 errors=y-y.hat
 plot(errors) #errors look good
